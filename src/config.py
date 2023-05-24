@@ -11,3 +11,6 @@ class Config:
         self.code_path_length = 8
         self.code_path_width = 2
         self.model_type = "P-Code-DKT" #[P-Code-DKT,DKT,Code-DKT]
+        self.MAX_CODE_LEN = 100
+        self.MAX_QUESTION_LEN_partI = 768
+        self.MAX_QUESTION_LEN_partII = 128

@@ -5,10 +5,10 @@
 # @Last Modified time: 2020-05-10 13:14:50
 import torch
 import torch.nn as nn
-MAX_CODE_LEN = 100
+
 
 class c2vRNNModel(nn.Module):
-    def __init__(self,model_type, input_dim, hidden_dim, layer_dim, output_dim, node_count, path_count, device):
+    def __init__(self,config,model_type, input_dim, hidden_dim, layer_dim, output_dim, node_count, path_count, device):
         super(c2vRNNModel, self).__init__()
 
         self.embed_nodes = nn.Embedding(node_count+2, 100) # adding unk and end
@@ -21,11 +21,11 @@ class c2vRNNModel(nn.Module):
         self.attention_softmax = nn.Softmax(dim=1)
 
         if model_type == "Code-DKT":
-            input_dimensions = 2*input_dim+300
+            input_dimensions = 2*input_dim + 3*config.MAX_CODE_LEN
         elif model_type == "DKT":
             input_dimensions = input_dim
         elif model_type == "P-Code-DKT":
-            input_dimensions = 2 * input_dim + 300 + 768 #( q, code, p)
+            input_dimensions = 2 * input_dim + 3*config.MAX_CODE_LEN + config.MAX_QUESTION_LEN_partI +config.MAX_QUESTION_LEN_partII  #( q, code, p)
 
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -41,6 +41,7 @@ class c2vRNNModel(nn.Module):
         self.sig = nn.Sigmoid()
         self.device = device
         self.model_type = model_type
+        self.config = config
 
     def forward(self, x, evaluating=False):  # shape of input: [batch_size, length, questions * 2+c2vnodes]
 #         h0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim, device=self.device)  # shape: [num_layers * num_directions, batch_size, hidden_size]
@@ -48,9 +49,9 @@ class c2vRNNModel(nn.Module):
         rnn_first_part = x[:, :, :self.input_dim] # (b,l,2q)
 
         # code vector
-        rnn_attention_part = torch.stack([rnn_first_part]*MAX_CODE_LEN,dim=-2) # (b,l,c,2q)
+        rnn_attention_part = torch.stack([rnn_first_part]*self.config.MAX_CODE_LEN,dim=-2) # (b,l,c,2q)
 
-        c2v_input = x[:, :, self.input_dim:MAX_CODE_LEN*3+ self.input_dim].reshape(x.size(0), x.size(1), MAX_CODE_LEN, 3).long() # (b,l,c,3)
+        c2v_input = x[:, :, self.input_dim:self.config.MAX_CODE_LEN*3+ self.input_dim].reshape(x.size(0), x.size(1), self.config.MAX_CODE_LEN, 3).long() # (b,l,c,3)
 
         starting_node_index = c2v_input[:,:,:,0] # (b,l,c,1)
         ending_node_index = c2v_input[:,:,:,2] # (b,l,c,1)
@@ -70,7 +71,7 @@ class c2vRNNModel(nn.Module):
         code_vectors = torch.sum(torch.mul(full_embed,attention_weights),dim=2) # (b,l,2ne+pe+2q)
 
         # question vector
-        question_vectors = x[:, :, MAX_CODE_LEN*3 + self.input_dim:] # (b,l,q_embedds)
+        question_vectors = x[:, :, self.config.MAX_CODE_LEN*3 + self.input_dim:] # (b,l,q_embedds)
 
 
         if self.model_type == "Code-DKT":

@@ -49,6 +49,9 @@ def main():
             "questions": config.questions,
             "assignment": config.assignment,
             "device": device,
+            "code": config.MAX_CODE_LEN*3,
+            "question": config.MAX_QUESTION_LEN_partI + config.MAX_QUESTION_LEN_partII,
+
         })
 
     performance_list = []
@@ -56,7 +59,7 @@ def main():
     first_scores_list = []
     first_total_scores_list = []
 
-    for fold in range(10):
+    for fold in range(1):
         print("----",fold,"-th run----")
 
         train_loader, test_loader = get_data_loader(config, config.questions, config.length, fold)
@@ -65,7 +68,7 @@ def main():
         else:
             node_count, path_count = np.load("../data/DKTFeatures_"+str(config.assignment)+"/np_counts.npy")
 
-        model = c2vRNNModel(config.model_type, config.questions * 2,
+        model = c2vRNNModel(config,config.model_type, config.questions * 2,
                             config.hidden,
                             config.layers,
                             config.questions,
