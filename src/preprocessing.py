@@ -37,6 +37,7 @@ np.save("../data/DKTFeatures_"+str(config.assignment)+"/training_students.npy", 
 np.save("../data/DKTFeatures_"+str(config.assignment)+"/testing_students.npy", test_s)
 
 file_test = open("../data/DKTFeatures_"+str(config.assignment)+"/test_data.csv","w")
+
 for s in test_s:
     if d[s]['length']>0:
         file_test.write(str(d[s]['length']))

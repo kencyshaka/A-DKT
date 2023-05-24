@@ -31,6 +31,12 @@ def main():
 
     setup_seed(0)
 
+    if torch.cuda.is_available():
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
     run = wandb.init(
         # Set the project where this run will be logged
         project="Code-DKT",
@@ -42,14 +48,8 @@ def main():
             "batch":config.bs,
             "questions": config.questions,
             "assignment": config.assignment,
+            "device": device,
         })
-
-    if torch.cuda.is_available():
-        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
-        
 
     performance_list = []
     scores_list = []
@@ -65,7 +65,7 @@ def main():
         else:
             node_count, path_count = np.load("../data/DKTFeatures_"+str(config.assignment)+"/np_counts.npy")
 
-        model = c2vRNNModel(config.questions * 2,
+        model = c2vRNNModel(config.model_type, config.questions * 2,
                             config.hidden,
                             config.layers,
                             config.questions,
@@ -113,7 +113,7 @@ def main():
             # print(i,j,table_data)
 
     wandb.log({'Scores for all fold:': wandb.Table(data=table_data, columns=columns)})
-
+    wandb.log({"First_AUC": np.mean(first_total_scores_list,axis=0)[0], "Overall_AUC": np.mean(performance_list,axis=0)[0]})
 
 if __name__ == '__main__':
     main()

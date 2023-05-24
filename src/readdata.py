@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 import pandas as pd
 from config import Config
-
+import re
 def create_word_index_table(vocab):
     """
     Creating word to index table
@@ -54,6 +54,7 @@ def convert_to_idx(sample, node_word_index, path_word_index):
     return sample_index
 
 MAX_CODE_LEN = 100
+MAX_QUESTION_LEN = 768
 
 class data_reader():
     def __init__(self, config,fold,train_path, val_path, test_path, maxstep, numofques):
@@ -122,8 +123,10 @@ class data_reader():
         # create ixtoword and wordtoix lists
         node_word_index, node_index_word = create_word_index_table(valid_node)
         path_word_index, path_index_word = create_word_index_table(valid_path)
-        
-        
+
+        question_embeddings = pd.read_csv('../data/question_embeddings.csv')
+        q_embeddings = question_embeddings[question_embeddings['AssignmentID'] == config.assignment]
+
         with open(file_path, 'r') as file:
             for lent, css, ques, ans in itertools.zip_longest(*[file] * 4):
                 lent = int(lent.strip().strip(','))
@@ -131,7 +134,10 @@ class data_reader():
                 ans = [int(a) for a in ans.strip().strip(',').split(',')]
                 css = [cs for cs in css.strip().strip(',').split(',')]
 
-                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3]) # Skill DKT #1, original
+                #temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3]) # Skill DKT #1, original
+
+                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3 + MAX_QUESTION_LEN]) # Skill DKT #1, original
+
                 if lent >= self.maxstep:
                     steps = self.maxstep
                     extra = 0
@@ -144,6 +150,17 @@ class data_reader():
 
 
                 for j in range(steps):
+                    # extract the question embeddings from
+
+                    question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
+                    question_embedding = question_embedding[ques[j]]
+                    values_str = question_embedding[question_embedding.index('[') + 1:question_embedding.index(']')]
+
+                    # Split the values by comma and remove any leading/trailing whitespace
+                    question_embeds = [float(val.strip()) for val in values_str.split(',')]
+                    question_embeds = np.array(question_embeds).reshape(1,MAX_QUESTION_LEN)
+
+
                     if ans[j] == 1:
                         temp[j+extra][ques[j]] = 1
                     else:
@@ -164,8 +181,10 @@ class data_reader():
                         features = np.array(raw_features).reshape(-1, MAX_CODE_LEN*3)
                         
 
-                        temp[j+extra][2*self.numofques:] = features
-                        
+                        temp[j+extra][2*self.numofques:MAX_CODE_LEN*3+2*self.numofques] = features  #[20:320]
+                        temp[j+extra][MAX_CODE_LEN*3+2*self.numofques:] = question_embeds    #[320:]
+
+
 
                 data.append(temp.tolist())
             print('done: ' + str(np.array(data).shape))

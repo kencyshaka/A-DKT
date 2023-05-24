@@ -7,6 +7,7 @@ class Config:
         self.epochs = 1    #40
         self.hidden = 128
         self.layers = 1
-        self.assignment = 487   # A1 = 439, A2 = 487, A3 = 492, A4 = 494, A5 - 502
+        self.assignment = 439   # A1 = 439, A2 = 487, A3 = 492, A4 = 494, A5 - 502
         self.code_path_length = 8
         self.code_path_width = 2
+        self.model_type = "P-Code-DKT" #[P-Code-DKT,DKT,Code-DKT]
