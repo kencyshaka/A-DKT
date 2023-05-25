@@ -49,6 +49,7 @@ def main():
             "questions": config.questions,
             "assignment": config.assignment,
             "device": device,
+            "model_type": config.model_type,
             "code": config.MAX_CODE_LEN*3,
             "question": config.MAX_QUESTION_LEN_partI + config.MAX_QUESTION_LEN_partII,
 
@@ -59,7 +60,7 @@ def main():
     first_scores_list = []
     first_total_scores_list = []
 
-    for fold in range(1):
+    for fold in range(10):
         print("----",fold,"-th run----")
 
         train_loader, test_loader = get_data_loader(config, config.questions, config.length, fold)

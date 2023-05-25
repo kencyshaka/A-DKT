@@ -5,10 +5,13 @@
 #large files
 src/wandb/
 data/
-
+*.out
+data.zip
+src/*.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__MACOSX/
 *.py[cod]
 *$py.class
 

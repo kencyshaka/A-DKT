@@ -124,11 +124,11 @@ class data_reader():
         # get the question embeddings
 
         #part I question embeddings from the GPT-2
-        question_embeddings = pd.read_csv('../data/question_embeddings.csv')
+        question_embeddings = pd.read_csv('../question/question_embeddings.csv')
         q_embeddings = question_embeddings[question_embeddings['AssignmentID'] == config.assignment]
 
         # part II question embeddings from the bipartite graph embeddings
-        embed_data = np.load('../data/embedding_50.npz')
+        embed_data = np.load('../question/embedding_60.npz')
         _, _, pre_pro_embed = embed_data['pro_repre'], embed_data['skill_repre'], embed_data['pro_final_repre']
         print(pre_pro_embed.shape, pre_pro_embed.dtype)
 
@@ -149,7 +149,7 @@ class data_reader():
                 if lent >= self.maxstep:
                     steps = self.maxstep
                     extra = 0
-                    ques = ques[-steps:]
+                    ques = ques[-steps:] 
                     ans = ans[-steps:]
                     css = css[-steps:]
                 else:
@@ -158,21 +158,40 @@ class data_reader():
 
 
                 for j in range(steps):
+                    
+                    if self.config.MAX_QUESTION_LEN_partI > 0 and self.config.MAX_QUESTION_LEN_partII > 0:
+                        # extract the question embeddings for Part I GPT_2
+                        question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
+                        question_embedding = question_embedding[ques[j]]
+                        values_str = question_embedding[question_embedding.index('[') + 1:question_embedding.index(']')]
 
-                    # extract the question embeddings for Part I GPT_2
-                    question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
-                    question_embedding = question_embedding[ques[j]]
-                    values_str = question_embedding[question_embedding.index('[') + 1:question_embedding.index(']')]
+
+                        question_embeds_partI = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
+                        question_embeds_partI = np.array(question_embeds_partI).reshape(1,self.config.MAX_QUESTION_LEN_partI)
+
+                        # extract the question embeddings for Part II bipartite
+                        question_embeds_partII = pre_pro_embed[ques[j]]
+                        question_embeds_partII = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
+
+                        question_embeds = np.concatenate((question_embeds_partI, question_embeds_partII), axis=1)
+
+                    elif self.config.MAX_QUESTION_LEN_partII == 0 and self.config.MAX_QUESTION_LEN_partI > 0:
+                        # extract the question embeddings for Part I GPT_2
+                        question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
+                        question_embedding = question_embedding[ques[j]]
+                        values_str = question_embedding[question_embedding.index('[') + 1:question_embedding.index(']')]
 
 
-                    question_embeds_partI = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
-                    question_embeds_partI = np.array(question_embeds_partI).reshape(1,self.config.MAX_QUESTION_LEN_partI)
+                        question_embeds_partI = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
+                        question_embeds = np.array(question_embeds_partI).reshape(1,self.config.MAX_QUESTION_LEN_partI)
+    
+                    
+                    elif self.config.MAX_QUESTION_LEN_partII > 0 and self.config.MAX_QUESTION_LEN_partI == 0:
 
-                    # extract the question embeddings for Part II bipartite
-                    question_embeds_partII = pre_pro_embed[ques[j]]
-                    question_embeds_partII = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
-                    question_embeds = np.concatenate((question_embeds_partI, question_embeds_partII), axis=1)
-
+                        # extract the question embeddings for Part II bipartite
+                        question_embeds_partII = pre_pro_embed[ques[j]]
+                        question_embeds = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
+                    
 
                     if ans[j] == 1:
                         temp[j+extra][ques[j]] = 1

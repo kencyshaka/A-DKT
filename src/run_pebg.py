@@ -55,7 +55,7 @@ def main(data_folder,saved_model_folder):
     keep_prob = 0.5
     lr = 0.001
     bs = 10    # 256
-    epochs = 50  # 200
+    epochs = 60  # 200
     model_flag = 0
     con_sym = '_'
 
@@ -174,7 +174,7 @@ def main(data_folder,saved_model_folder):
 
 if __name__ == '__main__':
     # Set device
-    data_folder = '../data'
+    data_folder = '../question'
     saved_model_folder = os.path.join(data_folder, 'pebg_model')
     if not os.path.exists(saved_model_folder):
         os.mkdir(saved_model_folder)
