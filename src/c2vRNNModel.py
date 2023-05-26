@@ -25,7 +25,9 @@ class c2vRNNModel(nn.Module):
         elif model_type == "DKT":
             input_dimensions = input_dim
         elif model_type == "P-Code-DKT":
-            input_dimensions = 2 * input_dim + 3*config.MAX_CODE_LEN + config.MAX_QUESTION_LEN_partI +config.MAX_QUESTION_LEN_partII  #( q, code, p)
+            input_dimensions = 2 * input_dim + 3*config.MAX_CODE_LEN + config.MAX_QUESTION_LEN_partI +config.MAX_QUESTION_LEN_partII  #( score, code, question,reference_soln)
+        elif model_type == "R-Code-DKT":    
+            input_dimensions = 2 * input_dim + 3*config.MAX_CODE_LEN + config.MAX_QUESTION_LEN_partI +config.MAX_QUESTION_LEN_partII + config.Reference_LEN  #( score, code, question,reference_soln)
 
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -71,8 +73,10 @@ class c2vRNNModel(nn.Module):
         code_vectors = torch.sum(torch.mul(full_embed,attention_weights),dim=2) # (b,l,2ne+pe+2q)
 
         # question vector
-        question_vectors = x[:, :, self.config.MAX_CODE_LEN*3 + self.input_dim:] # (b,l,q_embedds)
+        question_vectors = x[:, :, self.config.MAX_CODE_LEN*3 + self.input_dim:self.config.MAX_CODE_LEN*3 + self.input_dim + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII] # (b,l,q_embedds)
 
+        # reference vector 
+        reference_vectors = x[:, :, self.config.MAX_CODE_LEN*3 + self.input_dim + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII :] # (b,l,reference_embedds)
 
         if self.model_type == "Code-DKT":
             rnn_input = torch.cat((rnn_first_part, code_vectors), dim=2)
@@ -80,7 +84,8 @@ class c2vRNNModel(nn.Module):
             rnn_input = rnn_first_part
         elif self.model_type == "P-Code-DKT":
             rnn_input = torch.cat((rnn_first_part, code_vectors,question_vectors), dim=2)
-
+        elif self.model_type == "R-Code-DKT":
+            rnn_input = torch.cat((rnn_first_part, code_vectors,question_vectors, reference_vectors), dim=2)
         
 #         print(rnn_input.shape)
         out, hn = self.rnn(rnn_input)  # shape of out: [batch_size, length, hidden_size]

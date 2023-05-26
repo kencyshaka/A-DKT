@@ -128,9 +128,9 @@ class data_reader():
         q_embeddings = question_embeddings[question_embeddings['AssignmentID'] == config.assignment]
 
         # part II question embeddings from the bipartite graph embeddings
-        embed_data = np.load('../question/embedding_60.npz')
+        embed_data = np.load('../question/embedding_'+config.embedds_type+'.npz')
         _, _, pre_pro_embed = embed_data['pro_repre'], embed_data['skill_repre'], embed_data['pro_final_repre']
-        print(pre_pro_embed.shape, pre_pro_embed.dtype)
+        #print(pre_pro_embed.shape, pre_pro_embed.dtype)
 
 
 
@@ -144,7 +144,7 @@ class data_reader():
 
                 #temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3]) # Skill DKT #1, original
 
-                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques + self.config.MAX_CODE_LEN*3 + self.config.MAX_QUESTION_LEN_partI +self.config.MAX_QUESTION_LEN_partII]) # Skill DKT #1, original
+                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques + self.config.MAX_CODE_LEN*3 + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII+ self.config.Reference_LEN]) # Skill DKT #1, original
 
                 if lent >= self.maxstep:
                     steps = self.maxstep
@@ -158,7 +158,32 @@ class data_reader():
 
 
                 for j in range(steps):
+                   
+                    #Adding the correctness vector
+                    if ans[j] == 1:
+                        temp[j+extra][ques[j]] = 1
+                    else:
+                        temp[j+extra][ques[j] + self.numofques] = 1
+                            
+                    #extract the code vector        
+                    code = code_df[code_df['CodeStateID']==css[j]]['RawASTPath'].iloc[0]
                     
+                    
+                    if type(code) == str:
+                        code_paths = code.split("@")
+                        raw_features = convert_to_idx(code_paths, node_word_index, path_word_index)
+                        if len(raw_features) < self.config.MAX_CODE_LEN:
+                            raw_features += [[0,0,0]]*(self.config.MAX_CODE_LEN - len(raw_features))
+                        else:
+                            raw_features = raw_features[:self.config.MAX_CODE_LEN]
+                        
+
+                        features = np.array(raw_features).reshape(-1, self.config.MAX_CODE_LEN*3)
+                        
+
+                        temp[j+extra][2*self.numofques: self.config.MAX_CODE_LEN*3 + 2*self.numofques] = features  #[20:320]
+                        
+                    #extract the question vector 
                     if self.config.MAX_QUESTION_LEN_partI > 0 and self.config.MAX_QUESTION_LEN_partII > 0:
                         # extract the question embeddings for Part I GPT_2
                         question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
@@ -184,38 +209,26 @@ class data_reader():
 
                         question_embeds_partI = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
                         question_embeds = np.array(question_embeds_partI).reshape(1,self.config.MAX_QUESTION_LEN_partI)
-    
-                    
+
+
                     elif self.config.MAX_QUESTION_LEN_partII > 0 and self.config.MAX_QUESTION_LEN_partI == 0:
 
                         # extract the question embeddings for Part II bipartite
                         question_embeds_partII = pre_pro_embed[ques[j]]
                         question_embeds = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
                     
-
-                    if ans[j] == 1:
-                        temp[j+extra][ques[j]] = 1
-                    else:
-                        temp[j+extra][ques[j] + self.numofques] = 1
-                            
-                    code = code_df[code_df['CodeStateID']==css[j]]['RawASTPath'].iloc[0]
+                    temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques: self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII +self.config.MAX_CODE_LEN*3 + 2*self.numofques] = question_embeds    #[320: 868]
                     
+
+                    # extract the reference embeddings
+                    reference_embeds = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'reference-embedding']
+                    reference_embeds = reference_embeds[ques[j]]
+                    values_str = reference_embeds[reference_embeds.index('[') + 1:reference_embeds.index(']')]
+                    reference_embeds = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
+                    reference_embeds = np.array(reference_embeds).reshape(1,self.config.Reference_LEN)
                     
-                    if type(code) == str:
-                        code_paths = code.split("@")
-                        raw_features = convert_to_idx(code_paths, node_word_index, path_word_index)
-                        if len(raw_features) < self.config.MAX_CODE_LEN:
-                            raw_features += [[0,0,0]]*(self.config.MAX_CODE_LEN - len(raw_features))
-                        else:
-                            raw_features = raw_features[:self.config.MAX_CODE_LEN]
-                        
 
-                        features = np.array(raw_features).reshape(-1, self.config.MAX_CODE_LEN*3)
-                        
-
-                        temp[j+extra][2*self.numofques: self.config.MAX_CODE_LEN*3 + 2*self.numofques] = features  #[20:320]
-                        temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques:] = question_embeds    #[320:]
-
+                    temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII :] = reference_embeds   #[320+ 868: ]
 
 
                 data.append(temp.tolist())

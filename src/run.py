@@ -52,7 +52,7 @@ def main():
             "model_type": config.model_type,
             "code": config.MAX_CODE_LEN*3,
             "question": config.MAX_QUESTION_LEN_partI + config.MAX_QUESTION_LEN_partII,
-
+            "q_embedds_type": config.embedds_type
         })
 
     performance_list = []

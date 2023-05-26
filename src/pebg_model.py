@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 
-from PNN import pnn1
+from PNN_2 import pnn1
 
 class PEBGModel(nn.Module):
     def __init__(self, pro_num, skill_num, diff_feat_dim, embed_dim, hidden_dim, keep_prob):
