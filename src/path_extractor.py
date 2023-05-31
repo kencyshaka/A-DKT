@@ -167,14 +167,14 @@ def main():
     config = Config()
 
     code_df = pd.read_csv("../data/CodeStates/CodeStates.csv")
-    main_df = pd.read_csv('../data/MainTable.csv')
+    main_df = pd.read_csv('../data/updated_MainTable.csv')
     
-    main_df = main_df[main_df["EventType"] == "Run.Program"]
-    main_df = main_df[main_df["AssignmentID"] == config.assignment]
+    # main_df = main_df[main_df["EventType"] == "Run.Program"]
+    main_df = main_df[main_df["assignment_ID"] == config.assignment]
 
-    main_df['Score'] = np.array(main_df["Score"] == 1).astype(int)  
+    main_df['isError'] = np.array(main_df["isError"] == 1).astype(int)
     
-    main_df = main_df.merge(code_df, left_on="CodeStateID", right_on="CodeStateID")
+    main_df = main_df.merge(code_df, left_on="codestate_ID", right_on="CodeStateID")
     
     parsed_code = []
     print("parsing code")

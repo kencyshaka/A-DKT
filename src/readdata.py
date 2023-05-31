@@ -49,7 +49,7 @@ def convert_to_idx(sample, node_word_index, path_word_index):
                 ending_node = node_word_index[components[2]]
             else:
                 ending_node = node_word_index['UNK']
-        
+
         sample_index.append([starting_node,path,ending_node])
     return sample_index
 
@@ -68,12 +68,12 @@ class data_reader():
         data = []
         code_df = pd.read_csv("../data/DKTFeatures_"+str(config.assignment)+"/labeled_paths.tsv",sep="\t")
         training_students = np.load("../data/DKTFeatures_"+str(config.assignment)+"/training_students.npy",allow_pickle=True)
-        all_training_code = code_df[code_df['SubjectID'].isin(training_students)]['RawASTPath']
+        all_training_code = code_df[code_df['subject_ID'].isin(training_students)]['RawASTPath']
         separated_code = []
         for code in all_training_code:
             if type(code) == str:
                 separated_code.append(code.split("@"))
-        
+
         node_hist = {}
         path_hist = {}
         starting_nodes = []
@@ -136,11 +136,12 @@ class data_reader():
 
 
         with open(file_path, 'r') as file:
-            for lent, css, ques, ans in itertools.zip_longest(*[file] * 4):
+            for lent, css, ques, ans, err in itertools.zip_longest(*[file] * 5):
                 lent = int(lent.strip().strip(','))
                 ques = [int(q) for q in ques.strip().strip(',').split(',')]
                 ans = [int(a) for a in ans.strip().strip(',').split(',')]
                 css = [cs for cs in css.strip().strip(',').split(',')]
+                err = [er for er in err.strip().strip(',').split(',')]
 
                 #temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3]) # Skill DKT #1, original
 
@@ -149,26 +150,28 @@ class data_reader():
                 if lent >= self.maxstep:
                     steps = self.maxstep
                     extra = 0
-                    ques = ques[-steps:] 
+                    ques = ques[-steps:]
                     ans = ans[-steps:]
                     css = css[-steps:]
+                    err = err[-steps:]
+
                 else:
                     steps = lent
                     extra = self.maxstep-steps
 
 
                 for j in range(steps):
-                   
+
                     #Adding the correctness vector
                     if ans[j] == 1:
                         temp[j+extra][ques[j]] = 1
                     else:
                         temp[j+extra][ques[j] + self.numofques] = 1
-                            
-                    #extract the code vector        
+
+                    #extract the code vector
                     code = code_df[code_df['CodeStateID']==css[j]]['RawASTPath'].iloc[0]
-                    
-                    
+
+
                     if type(code) == str:
                         code_paths = code.split("@")
                         raw_features = convert_to_idx(code_paths, node_word_index, path_word_index)
@@ -176,14 +179,14 @@ class data_reader():
                             raw_features += [[0,0,0]]*(self.config.MAX_CODE_LEN - len(raw_features))
                         else:
                             raw_features = raw_features[:self.config.MAX_CODE_LEN]
-                        
+
 
                         features = np.array(raw_features).reshape(-1, self.config.MAX_CODE_LEN*3)
-                        
+
 
                         temp[j+extra][2*self.numofques: self.config.MAX_CODE_LEN*3 + 2*self.numofques] = features  #[20:320]
-                        
-                    #extract the question vector 
+
+                    #extract the question vector
                     if self.config.MAX_QUESTION_LEN_partI > 0 and self.config.MAX_QUESTION_LEN_partII > 0:
                         # extract the question embeddings for Part I GPT_2
                         question_embedding = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'prompt-embedding']
@@ -216,9 +219,9 @@ class data_reader():
                         # extract the question embeddings for Part II bipartite
                         question_embeds_partII = pre_pro_embed[ques[j]]
                         question_embeds = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
-                    
+
                     temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques: self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII +self.config.MAX_CODE_LEN*3 + 2*self.numofques] = question_embeds    #[320: 868]
-                    
+
 
                     # extract the reference embeddings
                     reference_embeds = q_embeddings.loc[q_embeddings['ProblemID'] == ques[j], 'reference-embedding']
@@ -226,10 +229,13 @@ class data_reader():
                     values_str = reference_embeds[reference_embeds.index('[') + 1:reference_embeds.index(']')]
                     reference_embeds = [float(val.strip()) for val in values_str.split(',')] # Split the values by comma and remove any leading/trailing whitespace
                     reference_embeds = np.array(reference_embeds).reshape(1,self.config.Reference_LEN)
-                    
+
 
                     temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII :] = reference_embeds   #[320+ 868: ]
 
+
+
+                    #extract error embeddings
 
                 data.append(temp.tolist())
             print('done: ' + str(np.array(data).shape))
@@ -241,12 +247,12 @@ class data_reader():
         train_data = self.get_data(self.train_path)
         val_data = self.get_data(self.val_path)
         if self.config.assignment == 487:
-            np.save("../data/DKTFeatures_"+str(config.assignment)+"/train_data_"+str(self.fold) +".npy", np.array(train_data+val_data))
+            np.save("../data/DKTFeatures_"+str(self.config.assignment)+"/train_data_"+str(self.fold) +".npy", np.array(train_data+val_data))
         return np.array(train_data+val_data)
 
     def get_test_data(self):
         print('loading test data...',self.test_path)
         test_data = self.get_data(self.test_path)
         if self.config.assignment == 487:
-            np.save("../data/DKTFeatures_"+str(config.assignment)+"/test_data_"+str(self.fold) +".npy", np.array(test_data))
+            np.save("../data/DKTFeatures_"+str(self.config.assignment)+"/test_data_"+str(self.fold) +".npy", np.array(test_data))
         return np.array(test_data)

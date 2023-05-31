@@ -39,7 +39,7 @@ def main():
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project="Code-DKT",
+        project="Error-DKT",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": config.lr,

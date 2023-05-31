@@ -6,7 +6,12 @@ This repository contains code for training a Knowledge Tracing (KT) model using 
 
 To train our KT model, the data needs to be processed. There are two major steps involved in the process.
 
-### Part I: Prepare the DKT Features
+### Part I: Prepare the dataset 
+First is to select students attempts with errors and their first compiled attempt for every question Features 
+
+1. Run src/error_preprocessing.py to select student and error associated with heir attempts 
+
+### Part II: Prepare the DKT Features
 To prepare the DKT features for training, validation, and testing, follow these steps:
 
 1. Run src/preprocessing.py to generate the DKT features.
@@ -14,7 +19,7 @@ This script will process the data and generate the necessary training, validatio
 
 2. Run src/path_extractor.py to extract paths for all submitted codes that are parsable. These paths will be used in code2vec.
 
-### Part II: Generate Bipartite Graph Embedding for the Questions
+### Part III: Generate Bipartite Graph Embedding for the Questions
 To generate the embeddings for the questions using the Product Layer and PEBG model, follow these steps:
 
 1. Run src/run_pebg.py to generate the embeddings using the implemented models.
