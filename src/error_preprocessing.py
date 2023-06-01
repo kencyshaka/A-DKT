@@ -1,23 +1,36 @@
 import re
 import pandas as pd
 from ProgSnap2 import ProgSnap2Dataset
-from ProgSnap2 import PS2
 
 
 def get_event_list(main_table):
-    compiled_errors = main_table[(main_table[PS2.EventType] == 'Compile') &
-                                 (main_table[
-                                      PS2.CompileResult] == 'Error')]  # Filter the main_table to contain submission that failed
+    submissions = []
+    grouped = main_table.groupby(['SubjectID', 'AssignmentID', 'ProblemID'])
 
-    compiled_success = main_table[
-        (main_table[PS2.EventType] == 'Compile') & (main_table[PS2.CompileResult] == 'Success')].groupby(
-        ['SubjectID', 'AssignmentID',
-         'ProblemID']).first().reset_index()  # Get the first compile success event for each subject, assignment, and problem
-    paired_error_success = pd.merge(compiled_errors, compiled_success,
-                                    on=[PS2.SubjectID, PS2.AssignmentID, PS2.ProblemID])
+    for _, group in grouped:
+        errors_found = False
+        submission_list = []
+        first_correct = True
+        for _, row in group.iterrows():
 
-    event_list = paired_error_success.groupby(['SubjectID', 'AssignmentID', 'ProblemID']).apply(
-        lambda x: list(x.EventID_x) + [x.EventID_y.iloc[0]]).reset_index(name='submission_event_list')
+            if row['EventType'] == 'Compile':
+                if row['Compile.Result'] == 'Error':
+                    errors_found = True
+                    first_correct = False
+                    submission_list.append(row['EventID'])
+                elif errors_found and not first_correct and row['Compile.Result'] == 'Success':
+                    submission_list.append(row['EventID'])
+                    first_correct = True
+                elif not errors_found:
+                    submission_list.append(row['EventID'])
+                    break
+        #         print(submissions)
+
+        submissions.extend(submission_list)
+    # print(submissions)
+    new_df = main_table[main_table['EventID'].isin(submissions)][['SubjectID', 'AssignmentID', 'ProblemID', 'EventID']]
+    event_list = new_df.groupby(['SubjectID', 'AssignmentID', 'ProblemID']).apply(
+        lambda x: list(x.EventID)).reset_index(name='submission_event_list')
 
     print("event list shape before cleaning wrong pairs ---", event_list.shape)
     event_list = event_list[~event_list['submission_event_list'].astype(str).str.contains(
@@ -174,12 +187,12 @@ def get_all_errors_per_line(error_line, error_list, df_error_ID):
 
         if line == error_line:
             message = remove_last_char_if_dot(get_error_message(error))
-
             ID.append(get_errorID(df_error_ID, message))
 
     # print("the ID is ", ID)
+    IDs = '_'.join(str(id) for id in ID)
 
-    return ID
+    return IDs
 
 
 def formatDataset_Error(df_submission, error_list, df_error_ID, main_table):
@@ -188,54 +201,55 @@ def formatDataset_Error(df_submission, error_list, df_error_ID, main_table):
     print("number of attempts per problem with errors", df_submission.shape)
     for _, row in df_submission.iterrows():
         submissions = row["submission_event_list"]
-
         submission_len = len(submissions)
 
         if submission_len == 1:
-            print("first attempt that was compilable")
+
             # add the errorID column for this attempt submmision event and the score
             data.append({
                 'subject_ID': row['SubjectID'],
                 'assignment_ID': row['AssignmentID'],
-                'problem_id': row['ProblemID'],
-                'submission_ID': submissions[i],
-                'codestate_ID': main_table.loc[main_table['EventID'] == submissions[submission_len], 'CodeStateID'].values[0],
+                'problem_ID': row['ProblemID'],
+                'submission_ID': submissions[submission_len-1],
+                'codestate_ID': main_table.loc[main_table['EventID'] == submissions[submission_len-1], 'CodeStateID'].values[0],
                 'isError': 0,
-                'error_ID': "[0]"
+                'error_ID': "0"
             })
         else:
-            for i in range(submission_len - 1):
-                error_msgs = error_list.loc[error_list['ParentEventID'] == submissions[i], 'submission_error_list'].values
-                error_msgs = error_msgs[0].split("@")
-                error_lines = [get_line_number(msg) for msg in error_msgs]
-                error_lines_unique = sorted(list(set(error_lines)))
-                error_IDs = []
-                for error_line_num in error_lines_unique:
-                    IDs = get_all_errors_per_line(error_line_num, error_msgs, df_error_ID)
-                    error_IDs.append(IDs)
+            for i in range(submission_len):
+                error_msgs = error_list.loc[
+                    error_list['ParentEventID'] == submissions[i], 'submission_error_list'].values
+                if error_msgs.size > 0: #the submission has errors
+                    # error_msgs = error_list.loc[error_list['ParentEventID'] == submissions[i], 'submission_error_list'].values
+                    error_msgs = error_msgs[0].split("@")
+                    error_lines = [get_line_number(msg) for msg in error_msgs]
+                    error_lines_unique = sorted(list(set(error_lines)))
+                    error_IDs = []
+                    for error_line_num in error_lines_unique:
+                        IDs = get_all_errors_per_line(error_line_num, error_msgs, df_error_ID)
+                        error_IDs.append(IDs)
 
-                # add the errorID column for this attempt submmision event and the score update base on the submission[i] eventID
-                data.append({
-                    'subject_ID': row['SubjectID'],
-                    'assignment_ID': row['AssignmentID'],
-                    'problem_ID': row['ProblemID'],
-                    'submission_ID': submissions[i],
-                    'codestate_ID': main_table.loc[main_table['EventID'] == submissions[i], 'CodeStateID'].values[0],
-                    'isError': 1,
-                    'error_ID': '_'.join(str(id) for id in error_IDs)
-                })
-
-            # add the last_submission index that wsa compilable include its score
-            data.append({
-                'subject_ID': row['SubjectID'],
-                'assignment_ID': row['AssignmentID'],
-                'problem_ID': row['ProblemID'],
-                'submission_ID': submissions[i],
-                'codestate_ID':
-                    main_table.loc[main_table['EventID'] == submissions[submission_len-1], 'CodeStateID'].values[0],
-                'isError': 0,
-                'error_ID': "[0]"
-            })
+                    # add the errorID column for this attempt submmision event and the score update base on the submission[i] eventID
+                    data.append({
+                        'subject_ID': row['SubjectID'],
+                        'assignment_ID': row['AssignmentID'],
+                        'problem_ID': row['ProblemID'],
+                        'submission_ID': submissions[i],
+                        'codestate_ID': main_table.loc[main_table['EventID'] == submissions[i], 'CodeStateID'].values[0],
+                        'isError': 1,
+                        'error_ID': '_'.join(str(id) for id in error_IDs)
+                    })
+                else:  #student has fixed esxisitng errors
+                    data.append({
+                        'subject_ID': row['SubjectID'],
+                        'assignment_ID': row['AssignmentID'],
+                        'problem_ID': row['ProblemID'],
+                        'submission_ID': submissions[i],
+                        'codestate_ID':
+                            main_table.loc[main_table['EventID'] == submissions[i], 'CodeStateID'].values[0],
+                        'isError': 0,
+                        'error_ID': "0"
+                    })
 
     df = pd.DataFrame(data)
     print("number of attempts with errors and first compiled solutions", df.shape)
@@ -255,12 +269,9 @@ if __name__ == '__main__':
     error_list = get_error_list(main_table)
 
     main_table = main_table[main_table['EventType'] == "Compile"]
-
     formated_data = formatDataset_Error(event_list, error_list, df_error_ID, main_table)
     print("the shape of the formated dataset", formated_data.shape)
 
-    print(formated_data.head())
-
     formated_data.to_csv('../data/updated_MainTable.csv', index=False)
 
-    # don't forget to add the student attempts that hard no error while it was their first attempt
+    

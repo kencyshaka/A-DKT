@@ -145,7 +145,7 @@ class data_reader():
 
                 #temp = np.zeros(shape=[self.maxstep, 2 * self.numofques+MAX_CODE_LEN*3]) # Skill DKT #1, original
 
-                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques + self.config.MAX_CODE_LEN*3 + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII+ self.config.Reference_LEN]) # Skill DKT #1, original
+                temp = np.zeros(shape=[self.maxstep, 2 * self.numofques + self.config.MAX_CODE_LEN*3 + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII+ self.config.Reference_LEN + self.config.ErrorID_LEN]) # Skill DKT #1, original
 
                 if lent >= self.maxstep:
                     steps = self.maxstep
@@ -220,7 +220,8 @@ class data_reader():
                         question_embeds_partII = pre_pro_embed[ques[j]]
                         question_embeds = question_embeds_partII.reshape(1,self.config.MAX_QUESTION_LEN_partII)
 
-                    temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques: self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII +self.config.MAX_CODE_LEN*3 + 2*self.numofques] = question_embeds    #[320: 868]
+                    section_two_question = self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII +self.config.MAX_CODE_LEN*3 + 2*self.numofques
+                    temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques: section_two_question ] = question_embeds    #[320: 868]
 
 
                     # extract the reference embeddings
@@ -231,15 +232,37 @@ class data_reader():
                     reference_embeds = np.array(reference_embeds).reshape(1,self.config.Reference_LEN)
 
 
-                    temp[j+extra][self.config.MAX_CODE_LEN*3 + 2*self.numofques + self.config.MAX_QUESTION_LEN_partI + self.config.MAX_QUESTION_LEN_partII :] = reference_embeds   #[320+ 868: ]
-
+                    section_two_reference = self.config.Reference_LEN + section_two_question
+                    temp[j+extra][section_two_question: section_two_reference] = reference_embeds   #[320+ 868: 320+ 868+200]
 
 
                     #extract error embeddings
+                    errorID_embeds = self.get_errorID_embeddings(err[j])
+                    temp[j + extra][section_two_reference:] = errorID_embeds
 
                 data.append(temp.tolist())
             print('done: ' + str(np.array(data).shape))
         return data
+
+    
+    def get_errorID_embeddings(self, error):
+
+        if '_' in error:
+
+            error_ids = [int(id) for id in error.split('_')]
+        else:
+            error_ids = [error]
+
+        # Remove duplicates and convert to integers
+        error_ids = list(set(error_ids))
+        error_ids = [int(id) for id in error_ids]
+
+        # Create a vector of size 84 with 1s at the specified indices
+        vector_size = self.config.ErrorID_LEN
+        vector = np.zeros((1, vector_size))
+        vector[0, error_ids] = 1
+
+        return vector
 
     def get_train_data(self):
         print('loading train data...',self.train_path)
